@@ -10,16 +10,19 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/nosana/grpc-to-http1-translation/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	definitions "github.com/nosana/grpc-to-http1-translation/definitions"
+	"os"
+
+	definitions "github.com/nosana/grpc-gateway-proxy/definitions"
 )
 
 type ProtobufStreamDecoder struct {
@@ -183,12 +186,14 @@ func (c *HTTPToGRPCConverter) handleUnaryHTTP(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", definitions.ContentTypeProtobuf)
-	respBytes, err := proto.Marshal(respMsg)
-	if err != nil {
-		http.Error(w, "Failed to marshal gRPC response", http.StatusInternalServerError)
-		return
-	}
-	w.Write(respBytes)
+       respBytes, err := proto.Marshal(respMsg)
+       if err != nil {
+	       http.Error(w, "Failed to marshal gRPC response", http.StatusInternalServerError)
+	       return
+       }
+       log.Printf("[http-proxy] Marshaled proto response bytes: %d bytes", len(respBytes))
+       log.Printf("[http-proxy] Marshaled proto response hex: %x", respBytes)
+       w.Write(respBytes)
 }
 
 func (c *HTTPToGRPCConverter) handleStreamHTTP(w http.ResponseWriter, r *http.Request, service, method string) {
@@ -241,13 +246,35 @@ func (c *HTTPToGRPCConverter) handleStreamHTTP(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func Start(http_proxy_port int, grpc_service_port int) {
+func Start(http_proxy_port int, grpc_service_port int, protoFiles []string) {
+	// Register all loaded file descriptors and message types with the global registries
+       for _, protoPath := range protoFiles {
+	       fileBytes, err := os.ReadFile(protoPath)
+	       if err != nil {
+		       log.Fatalf("failed to read proto file %s: %v", protoPath, err)
+	       }
+	       var fds descriptorpb.FileDescriptorSet
+	       if err := proto.Unmarshal(fileBytes, &fds); err != nil {
+		       log.Fatalf("failed to unmarshal FileDescriptorSet from %s: %v", protoPath, err)
+	       }
+	       files, err := protodesc.NewFiles(&fds)
+	       if err != nil {
+		       log.Fatalf("failed to create protodesc.Files from %s: %v", protoPath, err)
+	       }
+	       files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
+		       _ = protoregistry.GlobalFiles.RegisterFile(fd)
+		       for i := 0; i < fd.Messages().Len(); i++ {
+			       md := fd.Messages().Get(i)
+			       _ = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(md))
+		       }
+		       return true
+	       })
+       }
+
 	httpToGRPC, err := NewHTTPToGRPCConverter(fmt.Sprintf("0.0.0.0:%d", grpc_service_port))
-	
 	if err != nil {
 		log.Fatalf("Failed to create HTTP to gRPC converter: %v", err)
 	}
-
 	defer httpToGRPC.grpcConn.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
-	GRPCProxy "github.com/nosana/grpc-to-http1-translation/proxies/grpc"
-	HTTPProxy "github.com/nosana/grpc-to-http1-translation/proxies/http"
+	GRPCProxy "github.com/nosana/grpc-gateway-proxy/proxies/grpc"
+	HTTPProxy "github.com/nosana/grpc-gateway-proxy/proxies/http"
 )
 
 var rootCmd = &cobra.Command{
@@ -16,31 +19,85 @@ var rootCmd = &cobra.Command{
 	Long:  `A protocol-agnostic, production-ready proxy that bridges gRPC and HTTP/1.1. It enables seamless, bi-directional communication between gRPC clients and servers over HTTP/1.1, making it easy to integrate gRPC services with legacy systems, load balancers, and environments where HTTP/2 is not available..`,
 }
 
+// ensureDescriptorSets takes a list of proto files and returns a list of descriptor set files (.protoset).
+// If a file ends with .proto, it will generate a .protoset file using protoc.
+func ensureDescriptorSets(protoFiles []string) ([]string, error) {
+       var outFiles []string
+       for _, f := range protoFiles {
+	       if strings.HasSuffix(f, ".proto") {
+		       dir := filepath.Dir(f)
+		       base := filepath.Base(f)
+		       outBase := strings.TrimSuffix(base, ".proto") + ".protoset"
+		       out := filepath.Join(dir, outBase)
+		       protoInfo, err := os.Stat(f)
+		       if err != nil {
+			       return nil, fmt.Errorf("failed to stat proto file %s: %w", f, err)
+		       }
+		       needGen := false
+		       outInfo, err := os.Stat(out)
+		       if os.IsNotExist(err) {
+			       needGen = true
+		       } else if err != nil {
+			       return nil, fmt.Errorf("failed to stat protoset file %s: %w", out, err)
+		       } else if protoInfo.ModTime().After(outInfo.ModTime()) {
+			       needGen = true
+		       }
+		       if needGen {
+			       cmd := exec.Command("protoc", "--descriptor_set_out="+outBase, base)
+			       cmd.Stdout = os.Stdout
+			       cmd.Stderr = os.Stderr
+			       cmd.Dir = dir
+			       if err := cmd.Run(); err != nil {
+				       return nil, fmt.Errorf("failed to run protoc for %s: %w", f, err)
+			       }
+		       }
+		       outFiles = append(outFiles, out)
+	       } else {
+		       outFiles = append(outFiles, f)
+	       }
+       }
+       return outFiles, nil
+}
+
 func main() {
 	var grpcPort int
 	var remoteHTTPPort int
 	var httpPort int
 	var grpcServicePort int
+	var protoFiles []string
 
-	var grpcProxyCmd = &cobra.Command{
-		Use:   "start-grpc-proxy",
-		Short: "Start the gRPC to HTTP proxy",
-		Run: func(cmd *cobra.Command, args []string) {
-			GRPCProxy.Start(grpcPort, remoteHTTPPort)
-		},
-	}
-	grpcProxyCmd.Flags().IntVar(&grpcPort, "port", 9090, "The gRPC proxy listen port")
-	grpcProxyCmd.Flags().IntVar(&remoteHTTPPort, "remote_http_port", 8080, "The remote HTTP proxy port")
+       var grpcProxyCmd = &cobra.Command{
+	       Use:   "start-grpc-proxy",
+	       Short: "Start the gRPC to HTTP proxy",
+	       Run: func(cmd *cobra.Command, args []string) {
+		       files, err := ensureDescriptorSets(protoFiles)
+		       if err != nil {
+			       fmt.Fprintf(os.Stderr, "Failed to process proto files: %v\n", err)
+			       os.Exit(1)
+		       }
+		       GRPCProxy.Start(grpcPort, remoteHTTPPort, files)
+	       },
+       }
+  grpcProxyCmd.Flags().IntVar(&grpcPort, "port", 9090, "The gRPC proxy listen port")
+  grpcProxyCmd.Flags().IntVar(&remoteHTTPPort, "remote_http_port", 8080, "The remote HTTP proxy port")
+  grpcProxyCmd.Flags().StringArrayVar(&protoFiles, "proto", []string{}, "Path to a proto file (repeatable)")
 
-	var httpProxyCmd = &cobra.Command{
-		Use:   "start-http-proxy",
-		Short: "Start the HTTP to gRPC proxy",
-		Run: func(cmd *cobra.Command, args []string) {
-			HTTPProxy.Start(httpPort, grpcServicePort)
-		},
-	}
-	httpProxyCmd.Flags().IntVar(&httpPort, "port", 8080, "The HTTP proxy listen port")
-	httpProxyCmd.Flags().IntVar(&grpcServicePort, "grpc_service_port", 50051, "The gRPC backend service port")
+       var httpProxyCmd = &cobra.Command{
+	       Use:   "start-http-proxy",
+	       Short: "Start the HTTP to gRPC proxy",
+	       Run: func(cmd *cobra.Command, args []string) {
+		       files, err := ensureDescriptorSets(protoFiles)
+		       if err != nil {
+			       fmt.Fprintf(os.Stderr, "Failed to process proto files: %v\n", err)
+			       os.Exit(1)
+		       }
+		       HTTPProxy.Start(httpPort, grpcServicePort, files)
+	       },
+       }
+
+  httpProxyCmd.Flags().IntVar(&httpPort, "port", 8080, "The HTTP proxy listen port")
+  httpProxyCmd.Flags().IntVar(&grpcServicePort, "grpc_service_port", 50051, "The gRPC backend service port")
+  httpProxyCmd.Flags().StringArrayVar(&protoFiles, "proto", []string{}, "Path to a proto file (repeatable)")
 
 	rootCmd.AddCommand(grpcProxyCmd)
 	rootCmd.AddCommand(httpProxyCmd)

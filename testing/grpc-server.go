@@ -7,14 +7,12 @@ import (
 	"log"
 	"net"
 
-	pb "github.com/nosana/grpc-to-http1-translation/proto"
+	pb "github.com/nosana/grpc-gateway-proxy/testing/proto"
 	"google.golang.org/grpc"
 )
 
 var (
 	grpc_service_port = flag.Int("grpc_service_port", 50051, "The grpc service port")
-	grpc_proxy_port = flag.Int("grpc_proxy_port", 9090, "The GRPC -> REST proxy listener port")
-	http_proxy_port = flag.Int("http_proxy_port", 8080, "The REST -> GRPC proxy listener port")
 )
 
 type server struct {
