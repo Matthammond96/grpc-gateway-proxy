@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/nosana/grpc-to-http1-translation/proto";
+
+package myservice;
+
+service myservice {
+  rpc SayHello (HelloRequest) returns (HelloResponse) {}
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloResponse {
+  string message = 1;
+}
