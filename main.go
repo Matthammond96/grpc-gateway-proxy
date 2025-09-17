@@ -83,8 +83,8 @@ func main() {
 		},
 	}
 
-	grpcProxyCmd.Flags().IntVar(&grpc_listener_port, "grpc_listener_port", 9090, "The gRPC proxy listener port")
-	grpcProxyCmd.Flags().StringVar(&http_proxy_address, "http_proxy_address", "http://localhost:8080", "The HTTP proxy server address")
+	grpcProxyCmd.Flags().IntVar(&grpc_listener_port, "grpc-listener-port", 9090, "The gRPC proxy listener port")
+	grpcProxyCmd.Flags().StringVar(&http_proxy_address, "http-proxy-address", "http://localhost:8080", "The HTTP proxy server address")
 	grpcProxyCmd.Flags().StringArrayVar(&protoFiles, "proto", []string{}, "Path to a proto file (repeatable)")
 
 	var httpProxyCmd = &cobra.Command{
@@ -100,8 +100,8 @@ func main() {
 		},
 	}
 
-	httpProxyCmd.Flags().IntVar(&http_listener_port, "http_listener_port", 8080, "The HTTP proxy listener port")
-	httpProxyCmd.Flags().StringVar(&grpc_service_address, "grpc_service_address", "0.0.0.0:50051", "The gRPC backend service address")
+	httpProxyCmd.Flags().IntVar(&http_listener_port, "http-listener-port", 8080, "The HTTP proxy listener port")
+	httpProxyCmd.Flags().StringVar(&grpc_service_address, "grpc-service-address", "0.0.0.0:50051", "The gRPC backend service address")
 	httpProxyCmd.Flags().StringArrayVar(&protoFiles, "proto", []string{}, "Path to a proto file (repeatable)")
 
 	rootCmd.AddCommand(grpcProxyCmd)
