@@ -21,12 +21,15 @@ var rootCmd = &cobra.Command{
 
 func ensureDescriptorSets(protoFiles []string) ([]string, error) {
 	var outFiles []string
+	tempDir, err := os.MkdirTemp("", "protosets-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp dir for protosets: %w", err)
+	}
 	for _, f := range protoFiles {
 		if strings.HasSuffix(f, ".proto") {
-			dir := filepath.Dir(f)
 			base := filepath.Base(f)
 			outBase := strings.TrimSuffix(base, ".proto") + ".protoset"
-			out := filepath.Join(dir, outBase)
+			out := filepath.Join(tempDir, outBase)
 			protoInfo, err := os.Stat(f)
 			if err != nil {
 				return nil, fmt.Errorf("failed to stat proto file %s: %w", f, err)
@@ -41,10 +44,9 @@ func ensureDescriptorSets(protoFiles []string) ([]string, error) {
 				needGen = true
 			}
 			if needGen {
-				cmd := exec.Command("protoc", "--descriptor_set_out="+outBase, base)
+				cmd := exec.Command("protoc", "--descriptor_set_out="+out, f)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
-				cmd.Dir = dir
 				if err := cmd.Run(); err != nil {
 					return nil, fmt.Errorf("failed to run protoc for %s: %w", f, err)
 				}
