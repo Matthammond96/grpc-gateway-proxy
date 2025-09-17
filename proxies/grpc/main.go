@@ -190,12 +190,16 @@ func Start(grpc_proxy_port int, http_proxy_server_address string, protoFiles []s
 		}
 		for _, fd := range files {
 			allFiles = append(allFiles, fd)
-			// Register file descriptor with global registry
-			_ = protoregistry.GlobalFiles.RegisterFile(fd.UnwrapFile())
-			// Register all message types
+
+			if _, err := protoregistry.GlobalFiles.FindFileByPath(fd.GetName()); err != nil {
+				_ = protoregistry.GlobalFiles.RegisterFile(fd.UnwrapFile())
+			}
+
 			for _, msg := range fd.GetMessageTypes() {
 				if md, ok := msg.Unwrap().(protoreflect.MessageDescriptor); ok {
-					_ = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(md))
+					if _, err := protoregistry.GlobalTypes.FindMessageByName(md.FullName()); err != nil {
+						_ = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(md))
+					}
 				}
 			}
 		}

@@ -25,6 +25,25 @@ func ensureDescriptorSets(protoFiles []string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir for protosets: %w", err)
 	}
+
+	includePaths := make(map[string]struct{})
+	for _, f := range protoFiles {
+		if strings.HasSuffix(f, ".proto") {
+			dir := filepath.Dir(f)
+			includePaths[dir] = struct{}{}
+		}
+	}
+
+	cwd, err := os.Getwd()
+	if err == nil {
+		includePaths[cwd] = struct{}{}
+	}
+
+	var includeArgs []string
+	for dir := range includePaths {
+		includeArgs = append(includeArgs, "-I", dir)
+	}
+
 	for _, f := range protoFiles {
 		if strings.HasSuffix(f, ".proto") {
 			base := filepath.Base(f)
@@ -44,7 +63,9 @@ func ensureDescriptorSets(protoFiles []string) ([]string, error) {
 				needGen = true
 			}
 			if needGen {
-				cmd := exec.Command("protoc", "--descriptor_set_out="+out, f)
+				args := append(includeArgs, "--include_imports", "--descriptor_set_out="+out, f)
+				fmt.Fprintf(os.Stderr, "Running protoc: protoc %s\n", strings.Join(args, " "))
+				cmd := exec.Command("protoc", args...)
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
