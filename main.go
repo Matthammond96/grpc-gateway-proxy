@@ -19,8 +19,6 @@ var rootCmd = &cobra.Command{
 	Long:  `A protocol-agnostic, production-ready proxy that bridges gRPC and HTTP/1.1. It enables seamless, bi-directional communication between gRPC clients and servers over HTTP/1.1, making it easy to integrate gRPC services with legacy systems, load balancers, and environments where HTTP/2 is not available..`,
 }
 
-// ensureDescriptorSets takes a list of proto files and returns a list of descriptor set files (.protoset).
-// If a file ends with .proto, it will generate a .protoset file using protoc.
 func ensureDescriptorSets(protoFiles []string) ([]string, error) {
 	var outFiles []string
 	for _, f := range protoFiles {
