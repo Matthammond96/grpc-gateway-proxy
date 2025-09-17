@@ -58,10 +58,16 @@ func ensureDescriptorSets(protoFiles []string) ([]string, error) {
 }
 
 func main() {
-	var grpcPort int
-	var remoteHTTPPort int
-	var httpPort int
-	var grpcServicePort int
+	var (
+		grpc_listener_port int
+		http_proxy_address string
+	)
+
+	var (
+		http_listener_port   int
+		grpc_service_address string
+	)
+
 	var protoFiles []string
 
 	var grpcProxyCmd = &cobra.Command{
@@ -73,12 +79,12 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Failed to process proto files: %v\n", err)
 				os.Exit(1)
 			}
-			GRPCProxy.Start(grpcPort, remoteHTTPPort, files)
+			GRPCProxy.Start(grpc_listener_port, http_proxy_address, files)
 		},
 	}
 
-	grpcProxyCmd.Flags().IntVar(&grpcPort, "port", 9090, "The gRPC proxy listen port")
-	grpcProxyCmd.Flags().IntVar(&remoteHTTPPort, "remote_http_port", 8080, "The remote HTTP proxy port")
+	grpcProxyCmd.Flags().IntVar(&grpc_listener_port, "grpc_listener_port", 9090, "The gRPC proxy listener port")
+	grpcProxyCmd.Flags().StringVar(&http_proxy_address, "http_proxy_address", "http://localhost:8080", "The HTTP proxy server address")
 	grpcProxyCmd.Flags().StringArrayVar(&protoFiles, "proto", []string{}, "Path to a proto file (repeatable)")
 
 	var httpProxyCmd = &cobra.Command{
@@ -90,12 +96,12 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Failed to process proto files: %v\n", err)
 				os.Exit(1)
 			}
-			HTTPProxy.Start(httpPort, grpcServicePort, files)
+			HTTPProxy.Start(http_listener_port, grpc_service_address, files)
 		},
 	}
 
-	httpProxyCmd.Flags().IntVar(&httpPort, "port", 8080, "The HTTP proxy listen port")
-	httpProxyCmd.Flags().IntVar(&grpcServicePort, "grpc_service_port", 50051, "The gRPC backend service port")
+	httpProxyCmd.Flags().IntVar(&http_listener_port, "http_listener_port", 8080, "The HTTP proxy listener port")
+	httpProxyCmd.Flags().StringVar(&grpc_service_address, "grpc_service_address", "0.0.0.0:50051", "The gRPC backend service address")
 	httpProxyCmd.Flags().StringArrayVar(&protoFiles, "proto", []string{}, "Path to a proto file (repeatable)")
 
 	rootCmd.AddCommand(grpcProxyCmd)

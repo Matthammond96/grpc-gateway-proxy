@@ -168,10 +168,10 @@ func getServiceName(FullMethod string) string {
 	return ""
 }
 
-func Start(grpc_proxy_port int, http_proxy_port int, protoFiles []string) *grpc.Server {
+func Start(grpc_proxy_port int, http_proxy_server_address string, protoFiles []string) *grpc.Server {
 
 	// Create the gRPC server with your interceptors
-	grpcToHTTP := NewGRPCToHTTPConverter(fmt.Sprintf("http://0.0.0.0:%d", http_proxy_port))
+	grpcToHTTP := NewGRPCToHTTPConverter(http_proxy_server_address)
 	s := grpc.NewServer()
 
 	// Register all loaded file descriptors and message types with the global registries

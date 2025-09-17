@@ -246,7 +246,7 @@ func (c *HTTPToGRPCConverter) handleStreamHTTP(w http.ResponseWriter, r *http.Re
 	}
 }
 
-func Start(http_proxy_port int, grpc_service_port int, protoFiles []string) {
+func Start(http_proxy_port int, grpc_service_address string, protoFiles []string) {
 	// Register all loaded file descriptors and message types with the global registries
 	for _, protoPath := range protoFiles {
 		fileBytes, err := os.ReadFile(protoPath)
@@ -271,7 +271,7 @@ func Start(http_proxy_port int, grpc_service_port int, protoFiles []string) {
 		})
 	}
 
-	httpToGRPC, err := NewHTTPToGRPCConverter(fmt.Sprintf("0.0.0.0:%d", grpc_service_port))
+	httpToGRPC, err := NewHTTPToGRPCConverter(grpc_service_address)
 	if err != nil {
 		log.Fatalf("Failed to create HTTP to gRPC converter: %v", err)
 	}
