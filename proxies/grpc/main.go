@@ -66,14 +66,13 @@ func (c *GRPCToHTTPConverter) UnaryInterceptor() grpc.UnaryServerInterceptor {
 			return nil, status.Errorf(codes.Internal, "failed to marshal request: %v", err)
 		}
 
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", c.targetURL, bytes.NewReader(reqData))
+		url := strings.TrimRight(c.targetURL, "/") + info.FullMethod
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqData))
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to create HTTP request: %v", err)
 		}
 
 		httpReq.Header.Set("Content-Type", definitions.ContentTypeProtobuf)
-		httpReq.Header.Set(definitions.HeaderGRPCMethod, getMethodName(info.FullMethod))
-		httpReq.Header.Set(definitions.HeaderGRPCService, getServiceName(info.FullMethod))
 
 		if md, ok := metadata.FromIncomingContext(ctx); ok {
 			for key, values := range md {

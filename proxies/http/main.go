@@ -93,13 +93,14 @@ func (c *HTTPToGRPCConverter) HTTPHandler() http.HandlerFunc {
 			return
 		}
 
-		method := r.Header.Get(definitions.HeaderGRPCMethod)
-		service := r.Header.Get(definitions.HeaderGRPCService)
-
-		if method == "" || service == "" {
-			http.Error(w, "Missing gRPC method or service headers", http.StatusBadRequest)
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		parts := strings.SplitN(path, "/", 2)
+		if len(parts) != 2 {
+			http.Error(w, "Malformed URL: expected /<service>/<method>", http.StatusBadRequest)
 			return
 		}
+		service := parts[0]
+		method := parts[1]
 
 		contentType := r.Header.Get("Content-Type")
 
